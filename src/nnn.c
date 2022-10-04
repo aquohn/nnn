@@ -663,7 +663,7 @@ static const char * const messages[] = {
 	"invalid regex",
 	"'a'u/'d'u/'e'xt/'r'ev/'s'z/'t'm/'v'er/'c'lr/'^T'?",
 	"unmount failed! try lazy?",
-	"first file (\')/char?",
+	"first file (^)/char?",
 	"remove tmp file?",
 	"invalid key",
 	"unchanged",
@@ -4912,7 +4912,7 @@ static size_t handle_bookmark(const char *bmark, char *newpath)
 
 		if (bmark) { /* There is a marked directory */
 			g_buf[--r] = ' ';
-			g_buf[++r] = ',';
+			g_buf[++r] = '`';
 			g_buf[++r] = '\0';
 			++r;
 		}
@@ -4922,7 +4922,7 @@ static size_t handle_bookmark(const char *bmark, char *newpath)
 	}
 
 	r = FALSE;
-	if (fd == ',') /* Visit marked directory */
+	if (fd == '`') /* Visit marked directory */
 		bmark ? xstrsncpy(newpath, bmark, PATH_MAX) : (r = MSG_NOT_SET);
 	else if (fd == '\r') { /* Visit bookmarks directory */
 		mkpath(cfgpath, toks[TOK_BM], newpath);
@@ -4968,39 +4968,39 @@ static void show_help(const char *path)
 	const char helpstr[] = {
 	"0\n"
 	"1NAVIGATION\n"
-	       "9Up k  Up%-16cPgUp ^U  Page up\n"
-	       "9Dn j  Down%-14cPgDn ^D  Page down\n"
-	       "9Lt h  Parent%-12c~ ` @ -  ~, /, start, prev\n"
-	   "5Ret Rt l  Open%-20c'  First file/match\n"
-	       "9g ^A  Top%-21cJ  Jump to entry/offset\n"
-	       "9G ^E  End%-20c^J  Toggle auto-advance on open\n"
-	      "8B (,)  Book(mark)%-11cb ^/  Select bookmark\n"
+	       "6^P Up k  Up%-16cPgUp ^U  Page up\n"
+	       "6^N Dn j  Down%-14cPgDn ^D  Page down\n"
+	       "6^E Lt h  Parent%-11c~ # @ ^^  ~, /, start, prev\n"
+	   "2^Y Ret Rt l  Open%-20c^  First file/match\n"
+	       "7g Home  Top%-21cJ  Jump to entry/offset\n"
+	       "8G End  End%-20c^O  Toggle auto-advance on open\n"
+	      "8B (m)  Book(mark)%-14c` Select bookmark\n"
 		"a1-4  Context%-11c(Sh)Tab  Cycle/new context\n"
 	    "62Esc ^Q  Quit%-20cq  Quit context\n"
 		 "b^G  QuitCD%-18cQ  Pick/err, quit\n"
 	"0\n"
 	"1FILTER & PROMPT\n"
-		  "c/  Filter%-17c^N  Toggle type-to-nav\n"
+		  "c/  Filter%-17c^F  Toggle type-to-nav\n"
 		"aEsc  Exit prompt%-12c^L  Toggle last filter\n"
 		  "c.  Toggle hidden%-5cAlt+Esc  Unfilter, quit context\n"
 	"0\n"
 	"1FILES\n"
-	       "9o ^O  Open with%-15cn  Create new/link\n"
-	       "9f ^F  File stats%-14cd  Detail mode toggle\n"
+	       "co  Open with%-15cn  Create new/link\n"
+	       "cf  File stats%-14cd  Detail mode toggle\n"
 		 "b^R  Rename/dup%-14cr  Batch rename\n"
 		  "cz  Archive%-17ce  Edit file\n"
 		  "c*  Toggle exe%-14c>  Export list\n"
-	    "6Space +  (Un)select%-12cm-m  Select range/clear\n"
+	    "8Space  (Un)select%-12cv-v  Select range/clear\n"
 	          "ca  Select all%-14cA  Invert sel\n"
-	       "9p ^P  Copy here%-12cw ^W  Cp/mv sel as\n"
-	       "9v ^V  Move here%-15cE  Edit sel list\n"
-	       "9x ^X  Delete%-16cEsc  Send to FIFO\n"
+	       "cp  Copy here%-15cc  Cp/mv sel as\n"
+	       "cs  Move here%-15cE  Edit sel list\n"
+	       "cx  Delete%-16cEsc  Send to FIFO\n"
 	"0\n"
 	"1MISC\n"
 	      "8Alt ;  Select plugin%-11c=  Launch app\n"
 	       "9! ^]  Shell%-19c]  Cmd prompt\n"
-		  "cc  Connect remote%-10cu  Unmount remote/archive\n"
-	       "9t ^T  Sort toggles%-12cs  Manage session\n"
+		  "cC  Connect remote%-10cU  Unmount remote/archive\n"
+	       "ct  Sort toggles%-12cs  Manage session\n"
 		  "cT  Set time type%-11c0  Lock\n"
 		 "b^L  Redraw%-18c?  Help, conf\n"
 	};
@@ -6005,7 +6005,7 @@ static void handle_screen_move(enum action sel)
 		int r = (c == TOUPPER(*pdents[cur].name)) ? (cur + 1) : 0;
 
 		for (; r < ndents; ++r) {
-			if (((c == '\'') && !(pdents[r].flags & DIR_OR_DIRLNK))
+			if (((c == '^') && !(pdents[r].flags & DIR_OR_DIRLNK))
 			    || (c == TOUPPER(*pdents[r].name))) {
 				move_cursor((r) % ndents, 0);
 				break;

@@ -130,9 +130,11 @@ struct key {
 static struct key bindings[] = {
 	/* Back */
 	{ KEY_LEFT,       SEL_BACK },
+	{ CONTROL('E'),   SEL_BACK },
 	{ 'h',            SEL_BACK },
 	/* Inside or select */
 	{ KEY_ENTER,      SEL_OPEN },
+	{ CONTROL('Y'),   SEL_OPEN },
 	{ '\r',           SEL_OPEN },
 	/* Pure navigate inside */
 	{ KEY_RIGHT,      SEL_NAV_IN },
@@ -140,9 +142,11 @@ static struct key bindings[] = {
 	/* Next */
 	{ 'j',            SEL_NEXT },
 	{ KEY_DOWN,       SEL_NEXT },
+	{ CONTROL('N'),   SEL_NEXT },
 	/* Previous */
 	{ 'k',            SEL_PREV },
 	{ KEY_UP,         SEL_PREV },
+	{ CONTROL('P'),   SEL_PREV },
 	/* Page down */
 	{ KEY_NPAGE,      SEL_PGDN },
 	/* Page up */
@@ -154,13 +158,11 @@ static struct key bindings[] = {
 	/* First entry */
 	{ KEY_HOME,       SEL_HOME },
 	{ 'g',            SEL_HOME },
-	{ CONTROL('A'),   SEL_HOME },
 	/* Last entry */
 	{ KEY_END,        SEL_END },
 	{ 'G',            SEL_END },
-	{ CONTROL('E'),   SEL_END },
 	/* Go to first file */
-	{ '\'',           SEL_FIRST },
+	{ '^',            SEL_FIRST },
 	/* Jump to an entry number/offset */
 	{ 'J',            SEL_JUMP },
 	/* HOME */
@@ -168,14 +170,13 @@ static struct key bindings[] = {
 	/* Initial directory */
 	{ '@',            SEL_CDBEGIN },
 	/* Last visited dir */
-	{ '-',            SEL_CDLAST },
+	{  CONTROL('^'),  SEL_CDLAST },
 	/* Go to / */
-	{ '`',            SEL_CDROOT },
-	/* Leader key */
-	{ 'b',            SEL_BMOPEN },
-	{ CONTROL('_'),   SEL_BMOPEN },
+	{ '#',            SEL_CDROOT },
+	/* Open mark or bookmark */
+	{ '`',            SEL_BMOPEN },
 	/* Connect to server over SSHFS */
-	{ 'c',            SEL_REMOTE },
+	{ 'C',            SEL_REMOTE },
 	/* Cycle contexts in forward direction */
 	{ '\t',           SEL_CYCLE },
 	/* Cycle contexts in reverse direction */
@@ -192,34 +193,32 @@ static struct key bindings[] = {
 	{ '8',            SEL_CTX8 },
 #endif
 	/* Mark a path to visit later */
-	{ ',',            SEL_MARK },
+	{ 'm',            SEL_MARK },
 	/* Create a bookmark */
 	{ 'B',            SEL_BMARK },
 	/* Filter */
 	{ '/',            SEL_FLTR },
 	/* Toggle filter mode */
-	{ CONTROL('N'),   SEL_MFLTR },
+	{ CONTROL('F'),   SEL_MFLTR },
 	/* Toggle hide .dot files */
 	{ '.',            SEL_HIDDEN },
 	/* Detailed listing */
 	{ 'd',            SEL_DETAIL },
 	/* File details */
 	{ 'f',            SEL_STATS },
-	{ CONTROL('F'),   SEL_STATS },
 	/* Toggle executable status */
 	{ '*',            SEL_CHMODX },
 	/* Create archive */
 	{ 'z',            SEL_ARCHIVE },
 	/* Sort toggles */
 	{ 't',            SEL_SORT },
-	{ CONTROL('T'),   SEL_SORT },
 	/* Redraw window */
 	{ CONTROL('L'),   SEL_REDRAW },
 	/* Select current file path */
 	{ ' ',            SEL_SEL },
 	{ '+',            SEL_SEL },
 	/* Toggle select multiple files */
-	{ 'm',            SEL_SELMUL },
+	{ 'v',            SEL_SELMUL },
 	/* Select all files in current dir */
 	{ 'a',            SEL_SELALL },
 	/* Invert selection in current dir */
@@ -228,19 +227,14 @@ static struct key bindings[] = {
 	{ 'E',            SEL_SELEDIT },
 	/* Copy from selection buffer */
 	{ 'p',            SEL_CP },
-	{ CONTROL('P'),   SEL_CP },
 	/* Move from selection buffer */
-	{ 'v',            SEL_MV },
-	{ CONTROL('V'),   SEL_MV },
+	{ 's',            SEL_MV },
 	/* Copy/move from selection buffer and rename */
-	{ 'w',            SEL_CPMVAS },
-	{ CONTROL('W'),   SEL_CPMVAS },
+	{ 'c',            SEL_CPMVAS },
 	/* Delete from selection buffer */
 	{ 'x',            SEL_RM },
-	{ CONTROL('X'),   SEL_RM },
 	/* Open in a custom application */
 	{ 'o',            SEL_OPENWITH },
-	{ CONTROL('O'),   SEL_OPENWITH },
 	/* Create a new file */
 	{ 'n',            SEL_NEW },
 	/* Show rename prompt */
@@ -248,11 +242,11 @@ static struct key bindings[] = {
 	/* Rename contents of current dir */
 	{ 'r',            SEL_RENAMEMUL },
 	/* Disconnect a SSHFS mount point */
-	{ 'u',            SEL_UMOUNT },
+	{ 'U',            SEL_UMOUNT },
 	/* Show help */
 	{ '?',            SEL_HELP },
 	/* Toggle auto-advance on file open */
-	{ CONTROL('J'),   SEL_AUTONEXT },
+	{ CONTROL('O'),   SEL_AUTONEXT },
 	/* Edit in EDITOR */
 	{ 'e',            SEL_EDIT },
 	/* Run a plugin */
@@ -267,7 +261,7 @@ static struct key bindings[] = {
 	/* Lock screen */
 	{ '0',            SEL_LOCK },
 	/* Manage sessions */
-	{ 's',            SEL_SESSIONS },
+	{ 'S',            SEL_SESSIONS },
 	/* Export list */
 	{ '>',            SEL_EXPORT },
 	/* Set time type */

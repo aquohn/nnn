@@ -3396,13 +3396,6 @@ static int filterentries(char *path, char *lastname)
 			continue;
 		}
 
-		/* If the only match is a dir, auto-enter and cd into it */
-		if ((ndents == 1) && cfg.autoenter && (pdents[0].flags & DIR_OR_DIRLNK)) {
-			*ch = KEY_ENTER;
-			cur = 0;
-			goto end;
-		}
-
 		/*
 		 * redraw() should be above the auto-enter optimization, for
 		 * the case where there's an issue with dir auto-enter, say,

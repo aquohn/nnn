@@ -137,7 +137,7 @@
 #endif
 
 /* Macro definitions */
-#define VERSION      "4.6"
+#define VERSION      "4.7"
 #define GENERAL_INFO "BSD 2-Clause\nhttps://github.com/jarun/nnn"
 
 #ifndef NOSSN
@@ -195,6 +195,7 @@
 #define LIST_INPUT_MAX  ((size_t)LIST_FILES_MAX * PATH_MAX)
 #define SCROLLOFF       3
 #define COLOR_256       256
+#define CREATE_NEW_KEY  (-1)
 
 /* Time intervals */
 #define DBLCLK_INTERVAL_NS (400000000)
@@ -734,7 +735,7 @@ static char mv[] = "mv -i";
 #endif
 
 /* Archive commands */
-static const char * const archive_cmd[] = {"atool -a", "bsdtar -acvf", "zip -r", "tar -acvf"};
+static char * const archive_cmd[] = {"atool -a", "bsdtar -acvf", "zip -r", "tar -acvf"};
 
 /* Tokens used for path creation */
 #define TOK_BM  0
@@ -762,7 +763,7 @@ static const char * const patterns[] = {
 		"%s | tr '\\n' '\\0' | xargs -0 -n2 sh -c '%s \"$0\" \"$@\" < /dev/tty'",
 	"\\.(bz|bz2|gz|tar|taz|tbz|tbz2|tgz|z|zip)$", /* Basic formats that don't need external tools */
 	SED" -i 's|^%s\\(.*\\)$|%s\\1|' %s",
-	SED" -ze 's|^%s/||' '%s' | xargs -0 %s %s",
+	"xargs -0 %s %s < '%s'",
 };
 
 /* Colors */
@@ -1007,6 +1008,32 @@ static inline bool is_prefix(const char *restrict str, const char *restrict pref
 	return !strncmp(str, prefix, len);
 }
 
+static inline bool is_bad_len_or_dir(const char *restrict path)
+{
+	size_t len = xstrlen(path);
+
+	return ((len >= PATH_MAX) || (path[len - 1] == '/'));
+}
+
+static char *get_cwd_entry(const char *restrict cwdpath, char *entrypath, size_t *tokenlen)
+{
+	size_t len = xstrlen(cwdpath);
+	char *end;
+
+	if (!is_prefix(entrypath, cwdpath, len))
+		return NULL;
+
+	entrypath += len + 1; /* Add 1 for trailing / */
+	end = strchr(entrypath, '/');
+	if (end)
+		*tokenlen = end - entrypath;
+	else
+		*tokenlen = xstrlen(entrypath);
+	DPRINTF_U(*tokenlen);
+
+	return entrypath;
+}
+
 /*
  * The poor man's implementation of memrchr(3).
  * We are only looking for '/' and '.' in this program.
@@ -1110,7 +1137,19 @@ static size_t mkpath(const char *dir, const char *name, char *out)
 {
 	size_t len = 0;
 
-	if (name[0] != '/') { // NOLINT
+	if (name[0] == '~') { //NOLINT
+		len = xstrsncpy(out, home, PATH_MAX);
+		if (!name[1])
+			return len;
+
+		if (name[1] != '/') {
+			out[0] = '\0';
+			return 0;
+		}
+
+		--len;
+		++name;
+	} else if (name[0] != '/') { // NOLINT
 		/* Handle root case */
 		len = istopdir(dir) ? 1 : xstrsncpy(out, dir, PATH_MAX);
 		out[len - 1] = '/'; // NOLINT
@@ -1164,17 +1203,27 @@ static char *common_prefix(const char *path, char *prefix)
 /*
  * The library function realpath() resolves symlinks.
  * If there's a symlink in file list we want to show the symlink not what it's points to.
- * Resolves ./../~ in path
+ * Resolves ./../~ in filepath
  */
-static char *abspath(const char *path, const char *cwd, char *buf)
+static char *abspath(const char *filepath, char *cwd, char *buf)
 {
+	const char *path = filepath;
+	bool allocated = FALSE;
+
 	if (!path)
 		return NULL;
 
-	if (path[0] == '~')
+	if (path[0] == '~') {
 		cwd = home;
-	else if ((path[0] != '/') && !cwd)
+		++path;
+		if (*path == '/')
+			++path;
+	} else if ((path[0] != '/') && !cwd) {
 		cwd = getcwd(NULL, 0);
+		if (!cwd)
+			return NULL;
+		allocated = TRUE;
+	}
 
 	size_t dst_size = 0, src_size = xstrlen(path), cwd_size = cwd ? xstrlen(cwd) : 0;
 	size_t len = src_size;
@@ -1187,8 +1236,11 @@ static char *abspath(const char *path, const char *cwd, char *buf)
 	 */
 	char *resolved_path = buf ? buf : malloc(src_size + cwd_size + 2);
 
-	if (!resolved_path)
+	if (!resolved_path) {
+		if (allocated)
+			free(cwd);
 		return NULL;
+	}
 
 	/* Turn relative paths into absolute */
 	if (path[0] != '/') {
@@ -1198,6 +1250,8 @@ static char *abspath(const char *path, const char *cwd, char *buf)
 			return NULL;
 		}
 		dst_size = xstrsncpy(resolved_path, cwd, cwd_size + 1) - 1;
+		if (allocated)
+			free(cwd);
 	} else
 		resolved_path[0] = '\0';
 
@@ -1228,6 +1282,14 @@ static char *abspath(const char *path, const char *cwd, char *buf)
 	if (*resolved_path == '\0') {
 		resolved_path[0] = '/';
 		resolved_path[1] = '\0';
+	}
+
+	if (xstrlen(resolved_path) >= PATH_MAX) {
+		if (!buf)
+			free(resolved_path);
+		else
+			buf[0] = '\0';
+		return NULL;
 	}
 
 	return resolved_path;
@@ -1446,7 +1508,7 @@ static void writesel(const char *buf, const size_t buflen)
 	if (!selpath)
 		return;
 
-	int fd = open(selpath, O_CREAT | O_WRONLY | O_TRUNC, 0666);
+	int fd = open(selpath, O_CREAT | O_WRONLY | O_TRUNC, S_IWUSR | S_IRUSR);
 
 	if (fd != -1) {
 		if (write(fd, buf, buflen) != (ssize_t)buflen)
@@ -2669,7 +2731,7 @@ finish:
 }
 #endif
 
-static void get_archive_cmd(char *cmd, const char *archive)
+static char *get_archive_cmd(const char *archive)
 {
 	uchar_t i = 3;
 
@@ -2681,20 +2743,20 @@ static void get_archive_cmd(char *cmd, const char *archive)
 		i = 2;
 	// else tar
 
-	xstrsncpy(cmd, archive_cmd[i], ARCHIVE_CMD_LEN);
+	return archive_cmd[i];
 }
 
-static void archive_selection(const char *cmd, const char *archive, const char *curpath)
+static void archive_selection(const char *cmd, const char *archive)
 {
 	char *buf = malloc((xstrlen(patterns[P_ARCHIVE_CMD]) + xstrlen(cmd) + xstrlen(archive)
-	                   + xstrlen(curpath) + xstrlen(selpath)) * sizeof(char));
+	                   + xstrlen(selpath)) * sizeof(char));
 	if (!buf) {
 		DPRINTF_S(strerror(errno));
 		printwarn(NULL);
 		return;
 	}
 
-	snprintf(buf, CMD_LEN_MAX, patterns[P_ARCHIVE_CMD], curpath, selpath, cmd, archive);
+	snprintf(buf, CMD_LEN_MAX, patterns[P_ARCHIVE_CMD], cmd, archive, selpath);
 	spawn(utils[UTIL_SH_EXEC], buf, NULL, NULL, F_CLI | F_CONFIRM);
 	free(buf);
 }
@@ -2708,7 +2770,7 @@ static void write_lastdir(const char *curpath, const char *outfile)
 
 	int fd = open(outfile
 			? (outfile[0] == '~' ? g_buf : outfile)
-			: cfgpath, O_CREAT | O_WRONLY | O_TRUNC, 0666);
+			: cfgpath, O_CREAT | O_WRONLY | O_TRUNC, S_IWUSR | S_IRUSR);
 
 	if (fd != -1) {
 		dprintf(fd, "cd \"%s\"", curpath);
@@ -3643,7 +3705,7 @@ static char *getreadline(const char *prompt)
  * Create symbolic/hard link(s) to file(s) in selection list
  * Returns the number of links created, -1 on error
  */
-static int xlink(char *prefix, char *path, char *curfname, char *buf, int *presel, int type)
+static int xlink(char *prefix, char *path, char *curfname, char *buf, int type)
 {
 	int count = 0, choice;
 	char *psel = pselbuf, *fname;
@@ -3661,24 +3723,27 @@ static int xlink(char *prefix, char *path, char *curfname, char *buf, int *prese
 		link_fn = &link;
 
 	if (choice == 'c' || (nselected == 1)) {
-		mkpath(path, prefix, lnpath); /* Generate link path */
-		mkpath(path, (choice == 'c') ? curfname : pselbuf, buf); /* Generate target file path */
+		prefix = abspath(prefix, path, lnpath); /* Generate link path */
+		if (!prefix)
+			return -1;
 
-		if (!link_fn(buf, lnpath)) {
+		if (choice == 'c')
+			mkpath(path, curfname, buf); /* Generate target file path */
+
+		if (!link_fn((choice == 'c') ? buf : pselbuf, lnpath)) {
 			if (choice == 's')
 				clearselection();
 			return 1; /* One link created */
 		}
-
-		printwarn(presel);
-		return -1;
+		return 0;
 	}
+
+	r = xstrsncpy(buf, prefix, NAME_MAX + 1); /* Copy prefix */
 
 	while (pos < selbufpos) {
 		len = xstrlen(psel);
 		fname = xbasename(psel);
 
-		r = xstrsncpy(buf, prefix, NAME_MAX + 1); /* Copy prefix */
 		xstrsncpy(buf + r - 1, fname, NAME_MAX - r); /* Suffix target file name */
 		mkpath(path, buf, lnpath); /* Generate link path */
 
@@ -3689,7 +3754,8 @@ static int xlink(char *prefix, char *path, char *curfname, char *buf, int *prese
 		psel += len + 1;
 	}
 
-	clearselection();
+	if (count == nselected) /* Clear selection if all links are generated */
+		clearselection();
 	return count;
 }
 
@@ -4199,9 +4265,9 @@ static void save_session(const char *sname, int *presel)
 			if (cfg.curctx == i && ndents)
 				/* Update current file name, arrows don't update it */
 				xstrsncpy(g_ctx[i].c_name, pdents[cur].name, NAME_MAX + 1);
-			header.pathln[i] = strnlen(g_ctx[i].c_path, PATH_MAX) + 1;
-			header.lastln[i] = strnlen(g_ctx[i].c_last, PATH_MAX) + 1;
-			header.nameln[i] = strnlen(g_ctx[i].c_name, NAME_MAX) + 1;
+			header.pathln[i] = MIN(xstrlen(g_ctx[i].c_path), PATH_MAX) + 1;
+			header.lastln[i] = MIN(xstrlen(g_ctx[i].c_last), PATH_MAX) + 1;
+			header.nameln[i] = MIN(xstrlen(g_ctx[i].c_name), NAME_MAX) + 1;
 			header.fltrln[i] = REGEX_MAX;
 		}
 	}
@@ -4209,7 +4275,7 @@ static void save_session(const char *sname, int *presel)
 	mkpath(cfgpath, toks[TOK_SSN], ssnpath);
 	mkpath(ssnpath, sname, spath);
 
-	fd = open(spath, O_CREAT | O_WRONLY | O_TRUNC, 0666);
+	fd = open(spath, O_CREAT | O_WRONLY | O_TRUNC, S_IWUSR | S_IRUSR);
 	if (fd == -1) {
 		printwait(messages[MSG_SEL_MISSING], presel);
 		return;
@@ -4268,7 +4334,7 @@ static bool load_session(const char *sname, char **path, char **lastdir, char **
 	if (has_loaded_dynamically)
 		save_session("@", NULL);
 
-	fd = open(spath, O_RDONLY, 0666);
+	fd = open(spath, O_RDONLY, S_IWUSR | S_IRUSR);
 	if (fd == -1) {
 		if (!status) {
 			printmsg(messages[MSG_SEL_MISSING]);
@@ -4549,7 +4615,7 @@ next:
 			return FALSE;
 		}
 	} else {
-		int fd = open(path, O_CREAT, 0666);
+		int fd = open(path, O_CREAT | O_TRUNC, S_IWUSR | S_IRUSR); /* Forced create mode for files */
 
 		if (fd == -1 && errno != EEXIST) {
 			DPRINTF_S("open!");
@@ -6609,7 +6675,7 @@ static bool browse(char *ipath, const char *session, int pkey)
 
 	newpath[0] = runfile[0] = '\0';
 
-	presel = pkey ? ';' : ((cfg.filtermode
+	presel = pkey ? ((pkey == CREATE_NEW_KEY) ? 'n' : ';') : ((cfg.filtermode
 			|| (session && (g_ctx[cfg.curctx].c_fltr[0] == FILTER
 				|| g_ctx[cfg.curctx].c_fltr[0] == RFILTER)
 				&& g_ctx[cfg.curctx].c_fltr[1])) ? FILTER : 0);
@@ -7488,7 +7554,8 @@ nochange:
 		case SEL_NEW: // fallthrough
 		case SEL_RENAME:
 		{
-			int fd, ret = 'n';
+			int ret = 'n';
+			size_t len;
 
 			if (!ndents && (sel == SEL_OPENWITH || sel == SEL_RENAME))
 				break;
@@ -7527,12 +7594,20 @@ nochange:
 #endif
 				break;
 			case SEL_NEW:
-				r = get_input(messages[MSG_NEW_OPTS]);
+				if (!pkey) {
+					r = get_input(messages[MSG_NEW_OPTS]);
+					tmp = NULL;
+				} else {
+					r = 'f';
+					tmp = g_ctx[0].c_name;
+					pkey = '\0';
+				}
+
 				if (r == 'f' || r == 'd')
-					tmp = xreadline(NULL, messages[MSG_NEW_PATH]);
+					tmp = xreadline(tmp, messages[MSG_NEW_PATH]);
 				else if (r == 's' || r == 'h')
 					tmp = xreadline(NULL,
-						messages[nselected <= 1?MSG_NEW_PATH:MSG_LINK_PREFIX]);
+						messages[nselected <= 1 ? MSG_NEW_PATH : MSG_LINK_PREFIX]);
 				else
 					tmp = NULL;
 				break;
@@ -7541,31 +7616,39 @@ nochange:
 				break;
 			}
 
-			if (!tmp || !*tmp)
+			if (!tmp || !*tmp || is_bad_len_or_dir(tmp))
 				break;
 
 			switch (sel) {
 			case SEL_ARCHIVE:
 				if (r == 'c' && strcmp(tmp, pdents[cur].name) == 0)
-					goto nochange;
+					continue; /* Cannot overwrite the hovered file */
 
-				mkpath(path, tmp, newpath);
-				if (access(newpath, F_OK) == 0) {
+				tmp = abspath(tmp, NULL, newpath);
+				if (!tmp)
+					continue;
+				if (access(tmp, F_OK) == 0) {
 					if (!xconfirm(get_input(messages[MSG_OVERWRITE]))) {
 						statusbar(path);
 						goto nochange;
 					}
 				}
-				get_archive_cmd(newpath, tmp);
-				(r == 's') ? archive_selection(newpath, tmp, path)
-					   : spawn(newpath, tmp, pdents[cur].name,
+
+				(r == 's') ? archive_selection(get_archive_cmd(tmp), tmp)
+					   : spawn(get_archive_cmd(tmp), tmp, pdents[cur].name,
 						   NULL, F_CLI | F_CONFIRM);
 
-				mkpath(path, tmp, newpath);
-				if (access(newpath, F_OK) == 0) { /* File created */
-					xstrsncpy(lastname, tmp, NAME_MAX + 1);
-					clearfilter(); /* Archive name may not match */
-					clearselection(); /* Archive operation complete */
+				if (tmp && (access(tmp, F_OK) == 0)) { /* File created */
+					if (r == 's')
+						clearselection(); /* Archive operation complete */
+
+					/* Check if any entry is created in the current directory */
+					tmp = get_cwd_entry(path, tmp, &len);
+					if (tmp) {
+						xstrsncpy(lastname, tmp, len + 1);
+						clearfilter(); /* Archive name may not match */
+					} if (cfg.filtermode)
+						presel = FILTER;
 					cd = FALSE;
 					goto begin;
 				}
@@ -7577,10 +7660,12 @@ nochange:
 				copycurname();
 				goto nochange;
 			case SEL_RENAME:
+				r = 0;
 				/* Skip renaming to same name */
 				if (strcmp(tmp, pdents[cur].name) == 0) {
 					tmp = xreadline(pdents[cur].name, messages[MSG_COPY_NAME]);
-					if (!tmp || !tmp[0] || !strcmp(tmp, pdents[cur].name)) {
+					if (!tmp || !tmp[0] || is_bad_len_or_dir(tmp)
+					    || !strcmp(tmp, pdents[cur].name)) {
 						cfg.filtermode ?  presel = FILTER : statusbar(path);
 						copycurname();
 						goto nochange;
@@ -7592,28 +7677,22 @@ nochange:
 				break;
 			}
 
-			/* Open the descriptor to currently open directory */
-#ifdef O_DIRECTORY
-			fd = open(path, O_RDONLY | O_DIRECTORY);
-#else
-			fd = open(path, O_RDONLY);
-#endif
-			if (fd == -1) {
-				printwarn(&presel);
-				goto nochange;
+			if (!(r == 's' || r == 'h')) {
+				tmp = abspath(tmp, NULL, newpath);
+				if (!tmp) {
+					printwarn(&presel);
+					goto nochange;
+				}
 			}
 
 			/* Check if another file with same name exists */
-			if (fstatat(fd, tmp, &sb, AT_SYMLINK_NOFOLLOW) == 0) {
-				if (sel == SEL_RENAME) {
+			if (lstat(tmp, &sb) == 0) {
+				if ((sel == SEL_RENAME) || ((r == 'f') && (S_ISREG(sb.st_mode)))) {
 					/* Overwrite file with same name? */
-					if (!xconfirm(get_input(messages[MSG_OVERWRITE]))) {
-						close(fd);
+					if (!xconfirm(get_input(messages[MSG_OVERWRITE])))
 						break;
-					}
 				} else {
-					/* Do nothing in case of NEW */
-					close(fd);
+					/* Do nothing for SEL_NEW if a non-regular entry exists */
 					printwait(messages[MSG_EXISTS], &presel);
 					goto nochange;
 				}
@@ -7623,43 +7702,47 @@ nochange:
 				/* Rename the file */
 				if (ret == 'd')
 					spawn("cp -rp", pdents[cur].name, tmp, NULL, F_SILENT);
-				else if (renameat(fd, pdents[cur].name, fd, tmp) != 0) {
-					close(fd);
+				else if (rename(pdents[cur].name, tmp) != 0) {
 					printwarn(&presel);
 					goto nochange;
 				}
-				close(fd);
-				xstrsncpy(lastname, tmp, NAME_MAX + 1);
+
+				/* Check if any entry is created in the current directory */
+				tmp = get_cwd_entry(path, tmp, &len);
+				if (tmp)
+					xstrsncpy(lastname, tmp, len + 1);
+				/* Directory must be reloeaded for rename case */
 			} else { /* SEL_NEW */
-				close(fd);
 				presel = 0;
 
 				/* Check if it's a dir or file */
 				if (r == 'f' || r == 'd') {
-					mkpath(path, tmp, newpath);
-					ret = xmktree(newpath, r == 'f' ? FALSE : TRUE);
+					ret = xmktree(tmp, r == 'f' ? FALSE : TRUE);
 				} else if (r == 's' || r == 'h') {
 					if (nselected > 1 && tmp[0] == '@' && tmp[1] == '\0')
 						tmp[0] = '\0';
-					ret = xlink(tmp, path, (ndents ? pdents[cur].name : NULL),
-						  newpath, &presel, r);
+					ret = xlink(tmp, path, (ndents ? pdents[cur].name : NULL), newpath, r);
 				}
 
 				if (!ret)
-					printwait(messages[MSG_FAILED], &presel);
+					printwarn(&presel);
 
 				if (ret <= 0)
 					goto nochange;
 
-				if (r == 'f' || r == 'd')
-					xstrsncpy(lastname, tmp, NAME_MAX + 1);
-				else if (ndents) {
+				if (r == 'f' || r == 'd') {
+					tmp = get_cwd_entry(path, tmp, &len);
+					if (tmp)
+						xstrsncpy(lastname, tmp, len + 1);
+					else
+						continue; /* No change in directory */
+				} else if (ndents) {
 					if (cfg.filtermode)
 						presel = FILTER;
 					copycurname();
 				}
-				clearfilter();
 			}
+			clearfilter();
 
 			cd = FALSE;
 			goto begin;
@@ -8555,8 +8638,12 @@ int main(int argc, char *argv[])
 		} else { /* Open a file */
 			arg = argv[optind];
 			DPRINTF_S(arg);
-			if (xstrlen(arg) > 7 && is_prefix(arg, "file://", 7))
+			size_t len = xstrlen(arg);
+
+			if (len > 7 && is_prefix(arg, "file://", 7)) {
 				arg = arg + 7;
+				len -= 7;
+			}
 			initpath = abspath(arg, NULL, NULL);
 			DPRINTF_S(initpath);
 			if (!initpath) {
@@ -8576,11 +8663,24 @@ int main(int argc, char *argv[])
 			struct stat sb;
 
 			if (stat(initpath, &sb) == -1) {
-				xerror();
-				return EXIT_FAILURE;
-			}
+				bool dir = (arg[len - 1] == '/');
 
-			if (!S_ISDIR(sb.st_mode))
+				if (!dir) {
+					arg = xbasename(initpath);
+					initpath = xdirname(initpath);
+
+					pkey = CREATE_NEW_KEY; /* Override plugin key */
+					g_state.initfile = 1;
+				}
+				if (dir || (arg != initpath)) { /* We have a directory */
+					if (!xdiraccess(initpath) && !xmktree(initpath, TRUE)) {
+						xerror(); /* Fail if directory cannot be created */
+						return EXIT_FAILURE;
+					}
+					if (!dir) /* Restore the complete path */
+						*--arg = '/';
+				}
+			} else if (!S_ISDIR(sb.st_mode))
 				g_state.initfile = 1;
 
 			if (session)

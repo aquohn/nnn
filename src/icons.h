@@ -68,6 +68,7 @@
 #define ICON_ELIXIR        ICON_STR(MFIZZ_ELIXIR, "\ue62d", "💧")
 #define ICON_ENCRYPT       ICON_STR("", "\uf805", "🔒")
 #define ICON_FSHARP        ICON_STR(DEV_FSHARP, "\ue7a7", "")
+#define ICON_FONT          ICON_STR(FILE_FONT, "\uf031", "")
 #define ICON_GIT           ICON_STR(FA_GIT, "\ue5fb", "🌱")
 #define ICON_HASKELL       ICON_STR("", "\ue777", "")
 #define ICON_HTML          ICON_STR(FA_FILE_CODE_O, "\uf72d", "")
@@ -91,6 +92,7 @@
 #define ICON_PYTHON        ICON_STR(MFIZZ_PYTHON, "\ue235", "🐍")
 #define ICON_REACT         ICON_STR(FILE_JSX, "\ue625", ICON_JAVASCRIPT)
 #define ICON_RUBY          ICON_STR(MFIZZ_RUBY, "\ue23e", "💎")
+#define ICON_RUST          ICON_STR(DEV_RUST, "\ue7a8", "")
 #define ICON_SASS          ICON_STR("", "\ue603", "")
 #define ICON_SCRIPT        ICON_STR(MFIZZ_SCRIPT, "\ue795", "📜")
 #define ICON_SUBTITLE      ICON_STR(FA_COMMENTS_O, "\uf679", "💬")
@@ -123,6 +125,7 @@
 #define ICON_EXT_SCALA     ICON_STR(MFIZZ_SCALA, "\ue737", "")
 #define ICON_EXT_SLN       ICON_STR(DEV_VISUALSTUDIO, "\ue70c", "")
 #define ICON_EXT_TS        ICON_STR(FILE_TS, "\ue628", "")
+
 
 /*
  * Hex xterm 256 color code, 0 to follow file specific (if any)
@@ -193,9 +196,16 @@ static const struct icon_pair icons_name[] = {
 
 #ifdef ICONS_GENERATE
 /*
- * All entries are case-insensitive
+ * The goal here is to provide a small set of default values. We don't try to
+ * provide icons for everything under the sun because keeping a _huge_ table of
+ * icons would: increase binary size, increase memory usage, decrease performance.
+ *
+ * Users are free to customize this *locally* as they see fit. Only open a
+ * pull-request if you think your changes are aligned with the goal described
+ * above.
  */
-static const struct icon_pair icons_ext[] = {
+
+static const struct icon_pair icons_ext[] = { /* All entries are case-insensitive */
 	/* Numbers */
 	{"1",          ICON_MANUAL,         COLOR_DOCS},
 	{"7z",         ICON_ARCHIVE,        COLOR_ARCHIVE},
@@ -301,6 +311,7 @@ static const struct icon_pair icons_ext[] = {
 	{"jsx",        ICON_REACT,          COLOR_REACT},
 
 	/* K */
+	{"ksh",        ICON_SCRIPT,         COLOR_SHELL},
 
 	/* L */
 	{"lha",        ICON_ARCHIVE,        COLOR_ARCHIVE},
@@ -334,6 +345,7 @@ static const struct icon_pair icons_ext[] = {
 	{"ogg",        ICON_MUSICFILE,      COLOR_AUDIO},
 	{"opus",       ICON_MUSICFILE,      COLOR_AUDIO},
 	{"opdownload", ICON_DOWNLOADS,      0},
+	{"otf",        ICON_FONT,           0},
 	{"out",        ICON_LINUX,          0},
 
 	/* P */
@@ -347,10 +359,10 @@ static const struct icon_pair icons_ext[] = {
 	{"pptx",       ICON_POWERPOINT,     0},
 	{"psb",        ICON_PHOTOSHOP,      0},
 	{"psd",        ICON_PHOTOSHOP,      0},
-	{"py",         ICON_PYTHON,        COLOR_PYTHON},
-	{"pyc",        ICON_PYTHON,        COLOR_PYTHON},
-	{"pyd",        ICON_PYTHON,        COLOR_PYTHON},
-	{"pyo",        ICON_PYTHON,        COLOR_PYTHON},
+	{"py",         ICON_PYTHON,         COLOR_PYTHON},
+	{"pyc",        ICON_PYTHON,         COLOR_PYTHON},
+	{"pyd",        ICON_PYTHON,         COLOR_PYTHON},
+	{"pyo",        ICON_PYTHON,         COLOR_PYTHON},
 
 	/* Q */
 
@@ -360,6 +372,7 @@ static const struct icon_pair icons_ext[] = {
 	{"rc",         ICON_CONFIGURE,      0},
 	{"rom",        ICON_EXT_ROM,        0},
 	{"rpm",        ICON_ARCHIVE,        COLOR_ARCHIVE},
+	{"rs",         ICON_RUST,           COLOR_DOCS},
 	{"rss",        ICON_EXT_RSS,        0},
 	{"rtf",        ICON_EXT_RTF,        0},
 
@@ -381,10 +394,11 @@ static const struct icon_pair icons_ext[] = {
 	{"tar",        ICON_ARCHIVE,        COLOR_ARCHIVE},
 	{"tex",        ICON_TEX,            0},
 	{"tgz",        ICON_ARCHIVE,        COLOR_ARCHIVE},
-	{"ts",         ICON_EXT_TS,        COLOR_JAVASCRIPT},
+	{"ts",         ICON_EXT_TS,         COLOR_JAVASCRIPT},
 	{"tsx",        ICON_REACT,          COLOR_REACT},
 	{"txt",        ICON_DOCUMENT,       COLOR_DOCUMENT},
 	{"txz",        ICON_ARCHIVE,        COLOR_ARCHIVE},
+	{"ttf",        ICON_FONT,           0},
 
 	/* U */
 

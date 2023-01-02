@@ -1,4 +1,4 @@
-.Dd Jul 26, 2022
+.Dd Nov 24, 2022
 .Dt NNN 1
 .Os
 .Sh NAME
@@ -29,9 +29,23 @@ subshell spawning and much more. It remains a simple and
 efficient file manager that stays out of your way.
 .Pp
 .Nm
-opens the current working directory by default if
+opens the current working directory if
 .Ar PATH
-is not specified.
+is not specified. If
+.Ar PATH
+is specified and it exists,
+.Nm
+will open it. If the
+.Ar PATH
+doesn't exist and ends with a \fB/\fR,
+.Nm
+will attempt to create the directory tree and open it. Otherwise,
+.Ar PATH
+is considered a path to a regular file and
+.Nm
+attempts to create the complete directory tree to the file, open
+the parent directory and prompt to create the new file in it with
+the base filename.
 .Sh KEYBINDS
 .Pp
 Press

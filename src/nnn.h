@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2014-2016, Lazaros Koromilas <lostd@2f30.org>
  * Copyright (C) 2014-2016, Dimitris Papastamos <sin@2f30.org>
- * Copyright (C) 2016-2022, Arun Prakash Jana <engineerarun@gmail.com>
+ * Copyright (C) 2016-2023, Arun Prakash Jana <engineerarun@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -58,6 +58,7 @@ enum action {
 	SEL_END,
 	SEL_FIRST,
 	SEL_JUMP,
+	SEL_YOUNG,
 	SEL_CDHOME,
 	SEL_CDBEGIN,
 	SEL_CDLAST,
@@ -105,6 +106,7 @@ enum action {
 	SEL_AUTONEXT,
 	SEL_EDIT,
 	SEL_PLUGIN,
+	SEL_SELSIZE,
 	SEL_SHELL,
 	SEL_LAUNCH,
 	SEL_PROMPT,
@@ -165,6 +167,7 @@ static struct key bindings[] = {
 	{ '^',            SEL_FIRST },
 	/* Jump to an entry number/offset */
 	{ 'J',            SEL_JUMP },
+	{ 'Y',   SEL_YOUNG },
 	/* HOME */
 	{ '~',            SEL_CDHOME },
 	/* Initial directory */
@@ -251,6 +254,8 @@ static struct key bindings[] = {
 	{ 'e',            SEL_EDIT },
 	/* Run a plugin */
 	{ ';',            SEL_PLUGIN },
+	/* Show total size of listed selection */
+	{ 'S',            SEL_SELSIZE },
 	/* Run command */
 	{ '!',            SEL_SHELL },
 	{ CONTROL(']'),   SEL_SHELL },
